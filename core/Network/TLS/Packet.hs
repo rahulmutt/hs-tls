@@ -75,6 +75,8 @@ import qualified Data.ByteString.Char8 as BC
 import           Data.ByteArray (ByteArrayAccess)
 import qualified Data.ByteArray as B (convert)
 
+import Debug.Trace
+
 data CurrentParams = CurrentParams
     { cParamsVersion     :: Version                     -- ^ current protocol version
     , cParamsKeyXchgType :: Maybe CipherKeyExchangeType -- ^ current key exchange type
@@ -538,9 +540,10 @@ type PRF = ByteString -> ByteString -> Int -> ByteString
 -- instead of the default SHA256.
 getPRF :: Version -> Cipher -> PRF
 getPRF ver ciph
-    | ver < TLS12 = prf_MD5SHA1
-    | maybe True (< TLS12) (cipherMinVer ciph) = prf_SHA256
-    | otherwise = prf_TLS ver $ fromMaybe SHA256 $ cipherPRFHash ciph
+    | ver < TLS12 = traceShow ("getPRF < TLS12", ver, ciph) $ prf_MD5SHA1
+    | maybe True (< TLS12) (cipherMinVer ciph) = traceShow ("getPRF 2", ver, ciph) $ prf_SHA256
+    | otherwise = let x = fromMaybe SHA256 $ cipherPRFHash ciph in
+                  traceShow ("getPRF 3", ver, ciph) $  prf_TLS ver $ traceShow x x
 
 generateMasterSecret_SSL :: ByteArrayAccess preMaster => preMaster -> ClientRandom -> ServerRandom -> ByteString
 generateMasterSecret_SSL premasterSecret (ClientRandom c) (ServerRandom s) =
@@ -607,8 +610,10 @@ generateClientFinished :: Version
                        -> HashCtx
                        -> ByteString
 generateClientFinished ver ciph
-    | ver < TLS10 = generateFinished_SSL "CLNT"
-    | otherwise   = generateFinished_TLS (getPRF ver ciph) "client finished"
+    | ver < TLS10 = traceShow ("generateClientFinished < TLS 1", ver, ciph) $
+      generateFinished_SSL "CLNT"
+    | otherwise   = traceShow ("generateClientFinished >= TLS 1", ver, ciph) $
+      generateFinished_TLS (getPRF ver ciph) "client finished"
 
 generateServerFinished :: Version
                        -> Cipher
@@ -616,8 +621,10 @@ generateServerFinished :: Version
                        -> HashCtx
                        -> ByteString
 generateServerFinished ver ciph
-    | ver < TLS10 = generateFinished_SSL "SRVR"
-    | otherwise   = generateFinished_TLS (getPRF ver ciph) "server finished"
+    | ver < TLS10 = traceShow ("generateServerFinished < TLS 1", ver, ciph) $
+                    generateFinished_SSL "SRVR"
+    | otherwise   = traceShow ("generateServerFinished >= TLS 1", ver, ciph) $
+                    generateFinished_TLS (getPRF ver ciph) "server finished"
 
 {- returns *output* after final MD5/SHA1 -}
 generateCertificateVerify_SSL :: ByteString -> HashCtx -> ByteString

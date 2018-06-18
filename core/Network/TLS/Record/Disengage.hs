@@ -31,6 +31,7 @@ import Network.TLS.Packet
 import Network.TLS.Imports
 import qualified Data.ByteString as B
 import qualified Data.ByteArray as B (convert)
+import Debug.Trace
 
 disengageRecord :: Record Ciphertext -> RecordM (Record Plaintext)
 disengageRecord = decryptRecord >=> uncompressRecord
@@ -64,7 +65,8 @@ getCipherData (Record pt ver _) cdata = do
             let b = B.length pad - 1
             return (cver < TLS10 || B.replicate (B.length pad) (fromIntegral b) `bytesEq` pad)
 
-    unless (macValid &&! paddingValid) $ do
+
+    traceShow ("getCipherData", macValid, paddingValid) $ unless (macValid &&! paddingValid) $ do
         throwError $ Error_Protocol ("bad record mac", True, BadRecordMac)
 
     return $ cipherDataContent cdata
@@ -136,7 +138,7 @@ decryptData ver record econtent tst = decryptOf (cstKey cst)
                 nonce = cstIV (stCryptState tst) `B.append` enonce
                 (content, authTag2) = decryptF nonce econtent' ad
 
-            when (AuthTag (B.convert authTag) /= authTag2) $
+            traceShow ("decryptOf", AuthTag (B.convert authTag), authTag2) $ when (AuthTag (B.convert authTag) /= authTag2) $
                 throwError $ Error_Protocol ("bad record mac", True, BadRecordMac)
 
             modify incrRecordState

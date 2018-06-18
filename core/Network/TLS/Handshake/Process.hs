@@ -118,6 +118,7 @@ processClientFinished :: Context -> FinishedData -> IO ()
 processClientFinished ctx fdata = do
     (cc,ver) <- usingState_ ctx $ (,) <$> isClientContext <*> getVersion
     expected <- usingHState ctx $ getHandshakeDigest ver $ invertRole cc
+    print ("processClientFinished", expected, fdata)
     when (expected /= fdata) $ do
         throwCore $ Error_Protocol("bad record mac", True, BadRecordMac)
     usingState_ ctx $ updateVerifiedData ServerRole fdata
